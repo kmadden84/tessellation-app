@@ -561,6 +561,11 @@ export default function TessellationApp() {
     e.preventDefault();
     e.stopPropagation();
     
+    // Prevent any default touch behaviors
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -668,7 +673,11 @@ export default function TessellationApp() {
   }, [performMove]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>): void => {
+    // Always prevent default to stop scrolling
     e.preventDefault();
+    if (e.cancelable) {
+      e.preventDefault();
+    }
     performMove(e);
   }, [performMove]);
 
@@ -791,7 +800,7 @@ export default function TessellationApp() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-white">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-white" style={{ touchAction: 'manipulation' }}>
       {/* Skip Navigation */}
       <a 
         href="#main-content" 
@@ -977,13 +986,15 @@ export default function TessellationApp() {
             ref={canvasRef}
             className="relative w-full h-[600px] select-none focus:outline-none focus:ring-2 focus:ring-cyan-400"
             style={{ 
-              background: `radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 1) 100%)`
+              background: `radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 1) 100%)`,
+              touchAction: 'none' // Prevent default touch behaviors
             }}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleTouchEnd}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
+            onTouchStart={(e) => e.preventDefault()} // Prevent page scrolling on any touch
             onKeyDown={handleKeyDown}
             tabIndex={0}
             role="img"
@@ -1003,6 +1014,7 @@ export default function TessellationApp() {
               height="100%"
               viewBox="0 0 600 600"
               className="absolute inset-0"
+              style={{ touchAction: 'none' }}
               aria-hidden="true"
             >
               {/* Grid */}
@@ -1041,7 +1053,10 @@ export default function TessellationApp() {
                   onMouseDown={(e) => handleMouseDown(e, tile)}
                   onTouchStart={(e) => handleTouchStart(e, tile)}
                   className="cursor-move focus:outline-none"
-                  style={{ transformOrigin: '0 0' }}
+                  style={{ 
+                    transformOrigin: '0 0',
+                    touchAction: 'none'
+                  }}
                   tabIndex={0}
                   role="button"
                   aria-label={`${SHAPES[tile.shape].name} tile at position ${tile.x}, ${tile.y}${tile.isSymmetryMirror ? ' (symmetry mirror)' : ''}. Click to select, use arrow keys to move.`}
