@@ -81,14 +81,6 @@ const COLORS: readonly string[] = [
 
 const generateId = (): string => Math.random().toString(36).substring(2, 11);
 
-// Edge length for each shape (for snapping compatibility)
-const EDGE_LENGTHS: Record<ShapeType, number> = {
-  triangle: 50,
-  square: 50,   // square edge  
-  hexagon: 50,  // now matches square and triangle!
-  diamond: 42   // diamond edge
-};
-
 // Universal edge calculation for any shape at any rotation
 const getShapeEdges = (tile: Tile): Edge[] => {
   const cos = Math.cos(tile.rotation * Math.PI / 180);
@@ -646,8 +638,7 @@ export default function TessellationApp() {
         setTiles(prev => prev.map(tile => {
           if (tile.id === dragState.tileId) {
             const updatedTile = { ...tile, x: boundedX, y: boundedY };
-            // Update symmetry mirrors
-            const mirrors = createSymmetryMirrors(updatedTile);
+            // Symmetry mirrors are handled automatically
             return updatedTile;
           }
           // Update mirrors if this tile is the original
@@ -691,13 +682,13 @@ export default function TessellationApp() {
         
         // Apply all updates at once
         if (updatedTiles.size > 0) {
-          setTiles(prev => prev.map(tile => {
-            const update = updatedTiles.get(tile.id);
+          setTiles(prev => prev.map(currentTile => {
+            const update = updatedTiles.get(currentTile.id);
             if (update) {
-              const updatedTile = { ...tile, ...update };
+              const updatedTile = { ...currentTile, ...update };
               return updatedTile;
             }
-            return tile;
+            return currentTile;
           }));
         }
       }
