@@ -29,13 +29,6 @@ interface DragState {
   offsetY: number;
 }
 
-interface TouchState {
-  id: number;
-  tileId: string;
-  offsetX: number;
-  offsetY: number;
-}
-
 interface SuggestionPoint {
   x: number;
   y: number;
@@ -273,7 +266,6 @@ export default function TessellationApp() {
   const [selectedColor, setSelectedColor] = useState<string>(COLORS[0]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [symmetryMode, setSymmetryMode] = useState<SymmetryMode>('none');
-  const [activeTouches, setActiveTouches] = useState<TouchState[]>([]);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [announcements, setAnnouncements] = useState<string>('');
   
@@ -565,52 +557,28 @@ export default function TessellationApp() {
   }, []);
 
   // TOUCH DRAG HANDLERS - Multi-touch support
-  const handleTouchStart = useCallback((e: React.TouchEvent<SVGGElement>): void => {
+  const handleTouchStart = useCallback((e: React.TouchEvent<SVGGElement>, targetTile: Tile): void => {
     e.preventDefault();
     e.stopPropagation();
     
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Handle each new touch
-    const newTouches: TouchState[] = [];
+    const touch = e.touches[0]; // Use first touch
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
     
-    for (let i = 0; i < e.touches.length; i++) {
-      const touch = e.touches[i];
-      const touchX = touch.clientX - rect.left;
-      const touchY = touch.clientY - rect.top;
-      
-      // Check if this touch is on a tile
-      const touchedTile = tiles.find(t => {
-        const distance = Math.sqrt(
-          Math.pow(t.x - touchX, 2) + Math.pow(t.y - touchY, 2)
-        );
-        return distance < 50; // Within tile bounds
-      });
-      
-      if (touchedTile) {
-        newTouches.push({
-          id: touch.identifier,
-          tileId: touchedTile.id,
-          offsetX: touchX - touchedTile.x,
-          offsetY: touchY - touchedTile.y
-        });
-        
-        // Set first touch as selected
-        if (i === 0) {
-          setSelectedTile(touchedTile);
-          setDragState({
-            isDragging: true,
-            tileId: touchedTile.id,
-            offsetX: touchX - touchedTile.x,
-            offsetY: touchY - touchedTile.y
-          });
-        }
-      }
-    }
+    // Set the touched tile as selected and start dragging
+    setSelectedTile(targetTile);
+    setDragState({
+      isDragging: true,
+      tileId: targetTile.id,
+      offsetX: touchX - targetTile.x,
+      offsetY: touchY - targetTile.y
+    });
     
-    setActiveTouches(prev => [...prev, ...newTouches]);
-  }, [tiles]);
+    announce(`Selected ${SHAPES[targetTile.shape].name} tile`);
+  }, [announce]);
 
   // Performance-optimized move handler with RAF
   const performMove = useCallback((touches: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
@@ -657,43 +625,43 @@ export default function TessellationApp() {
             : prev
         );
       }
-      // Handle multi-touch move
-      else if ('touches' in touches) {
-        const updatedTiles = new Map<string, { x: number; y: number }>();
+      // Handle touch move
+      else if ('touches' in touches && touches.touches.length > 0) {
+        if (!dragState.isDragging || !dragState.tileId) return;
         
-        // Process each active touch
-        for (let i = 0; i < touches.touches.length; i++) {
-          const touch = touches.touches[i];
-          const touchState = activeTouches.find(t => t.id === touch.identifier);
-          
-          if (touchState) {
-            const touchX = touch.clientX - rect.left;
-            const touchY = touch.clientY - rect.top;
-            
-            const newX = touchX - touchState.offsetX;
-            const newY = touchY - touchState.offsetY;
-            
-            const boundedX = Math.max(50, Math.min(550, newX));
-            const boundedY = Math.max(50, Math.min(550, newY));
-            
-            updatedTiles.set(touchState.tileId, { x: boundedX, y: boundedY });
+        const touch = touches.touches[0]; // Use first touch
+        const touchX = touch.clientX - rect.left;
+        const touchY = touch.clientY - rect.top;
+        
+        const newX = touchX - dragState.offsetX;
+        const newY = touchY - dragState.offsetY;
+        
+        const boundedX = Math.max(50, Math.min(550, newX));
+        const boundedY = Math.max(50, Math.min(550, newY));
+        
+        setTiles(prev => prev.map(tile => {
+          if (tile.id === dragState.tileId) {
+            const updatedTile = { ...tile, x: boundedX, y: boundedY };
+            return updatedTile;
           }
-        }
+          // Update mirrors if this tile is the original
+          if (tile.originalId === dragState.tileId && tile.isSymmetryMirror) {
+            const originalTile = { ...tile, x: boundedX, y: boundedY, isSymmetryMirror: false, originalId: undefined };
+            const mirrors = createSymmetryMirrors(originalTile);
+            const mirrorIndex = mirrors.findIndex(m => m.x === tile.x && m.y === tile.y);
+            return mirrorIndex >= 0 ? { ...mirrors[mirrorIndex], id: tile.id, isSymmetryMirror: true, originalId: tile.originalId } : tile;
+          }
+          return tile;
+        }));
         
-        // Apply all updates at once
-        if (updatedTiles.size > 0) {
-          setTiles(prev => prev.map(currentTile => {
-            const update = updatedTiles.get(currentTile.id);
-            if (update) {
-              const updatedTile = { ...currentTile, ...update };
-              return updatedTile;
-            }
-            return currentTile;
-          }));
-        }
+        setSelectedTile(prev => 
+          prev && prev.id === dragState.tileId 
+            ? { ...prev, x: boundedX, y: boundedY }
+            : prev
+        );
       }
     });
-  }, [dragState, activeTouches, createSymmetryMirrors]);
+  }, [dragState, createSymmetryMirrors]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>): void => {
     performMove(e);
@@ -755,8 +723,7 @@ export default function TessellationApp() {
       }
     }
     
-    // Clear all touch states
-    setActiveTouches([]);
+    // Clear drag state
     setDragState({
       isDragging: false,
       tileId: null,
@@ -1072,7 +1039,7 @@ export default function TessellationApp() {
                   key={tile.id}
                   transform={`translate(${tile.x}, ${tile.y}) rotate(${tile.rotation})`}
                   onMouseDown={(e) => handleMouseDown(e, tile)}
-                  onTouchStart={(e) => handleTouchStart(e)}
+                  onTouchStart={(e) => handleTouchStart(e, tile)}
                   className="cursor-move focus:outline-none"
                   style={{ transformOrigin: '0 0' }}
                   tabIndex={0}
