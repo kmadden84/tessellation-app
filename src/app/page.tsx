@@ -565,7 +565,7 @@ export default function TessellationApp() {
   }, []);
 
   // TOUCH DRAG HANDLERS - Multi-touch support
-  const handleTouchStart = useCallback((e: React.TouchEvent<SVGGElement>, tile: Tile): void => {
+  const handleTouchStart = useCallback((e: React.TouchEvent<SVGGElement>): void => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -1072,7 +1072,7 @@ export default function TessellationApp() {
                   key={tile.id}
                   transform={`translate(${tile.x}, ${tile.y}) rotate(${tile.rotation})`}
                   onMouseDown={(e) => handleMouseDown(e, tile)}
-                  onTouchStart={(e) => handleTouchStart(e, tile)}
+                  onTouchStart={(e) => handleTouchStart(e)}
                   className="cursor-move focus:outline-none"
                   style={{ transformOrigin: '0 0' }}
                   tabIndex={0}
